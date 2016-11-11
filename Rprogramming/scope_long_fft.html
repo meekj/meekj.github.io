@@ -239,7 +239,7 @@ hr {
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.
 
-## $Id: scope_comm.R,v 1.1 2016/10/31 03:26:45 meekj Exp $
+## $Id: scope_comm.R,v 1.3 2016/11/11 17:07:10 meekj Exp $
 
 ## The functions below will eventually be part of a R package, likely to be called oscilloscopeR
 ## A multiple channel read function will be added
@@ -257,15 +257,15 @@ scopeGetSingleWaveform &lt;- function(connection, channel, points, Debug = FALSE
     writeLines(&quot;WAVeform:POINts:MODE RAW&quot;, connection)    # Needed to get more than 62500 points
     flush(connection)
 
-    num_points_string &lt;- paste(&#39;WAVEFORM:POINTS&#39; ,points)
+    num_points_string &lt;- paste(&#39;WAVEFORM:POINTS&#39; ,points) # Number of points requested, you might get fewer
     writeLines(num_points_string, connection)
     flush(connection)
 
-    channel_string &lt;- paste(&#39;WAVEFORM:SOURCE CHANNEL&#39;, channel, sep =&#39;&#39;)
+    channel_string &lt;- paste(&#39;WAVEFORM:SOURCE CHANNEL&#39;, channel, sep =&#39;&#39;) # Select scope channel
     writeLines(channel_string, connection)
     flush(connection)
 
-    writeLines(&quot;WAVEFORM:PREAMBLE?&quot;, connection)
+    writeLines(&quot;WAVEFORM:PREAMBLE?&quot;, connection)          # Request the preamble string
     flush(connection)
 
     wave_preamble &lt;- NULL
@@ -280,7 +280,7 @@ scopeGetSingleWaveform &lt;- function(connection, channel, points, Debug = FALSE
 
     wave_preamble_items &lt;- unlist(strsplit(wave_preamble, &#39;[,\n]&#39;)) # Possibly need to add \r on Windows?
 
-    wave_format     &lt;- as.integer(wave_preamble_items[1])
+    wave_format     &lt;- as.integer(wave_preamble_items[1]) # Unpack the preamble string
     wave_type       &lt;- as.integer(wave_preamble_items[2])
     wave_num_points &lt;- as.integer(wave_preamble_items[3])
     wave_count      &lt;- as.integer(wave_preamble_items[4])
@@ -291,21 +291,21 @@ scopeGetSingleWaveform &lt;- function(connection, channel, points, Debug = FALSE
     wave_yorigin    &lt;- as.numeric(wave_preamble_items[9])
     wave_yreference &lt;- as.integer(wave_preamble_items[10])
 
-    writeLines(&quot;WAVEFORM:DATA?&quot;, connection)
+    writeLines(&quot;WAVEFORM:DATA?&quot;, connection)    # Request waveform data
     flush(connection)
 
     buffer_header &lt;- NULL
     i &lt;- 0
-    while (length(buffer_header) == 0) {
+    while (length(buffer_header) == 0) {        # Get the header, which we ignore for now, the Perl utility uses it
         i &lt;- i + 1
-        buffer_header &lt;- readBin(connection, &quot;raw&quot;, 10)
+        buffer_header &lt;- readBin(connection, &quot;raw&quot;, 10) # 10 bytes of header data
         Sys.sleep(loop_sleep)
     }
     if (Debug) {cat(paste(&quot;buffer_header read loops: &quot;, i, &quot;\n\n&quot;))}
 
     buffer &lt;- NULL
     i &lt;- 0
-    while (length(buffer) &lt; wave_num_points) {
+    while (length(buffer) &lt; wave_num_points) {  # Get the waveform data, looping until we have it all
         i &lt;- i + 1
         charRead &lt;- readBin(connection, &quot;raw&quot;, wave_num_points + 1)
         buffer &lt;- append(buffer, as.integer(charRead))
@@ -315,6 +315,7 @@ scopeGetSingleWaveform &lt;- function(connection, channel, points, Debug = FALSE
     if (Debug) {cat(paste(&quot;final buffer read loops: &quot;, i, length(buffer), &quot;\n\n&quot;))}
     buffer &lt;- buffer[-length(buffer)] # Drop last element, which seems to be LF
 
+    # Return a data frame
     data.frame(list(t = wave_xorigin + wave_xincrement * (1:wave_num_points - wave_xreference),
                     y = wave_yorigin + wave_yincrement * (buffer - wave_yreference) ))
 }
@@ -323,19 +324,13 @@ scopeGetSingleWaveform &lt;- function(connection, channel, points, Debug = FALSE
 ##
 ## Sample usage
 ##
-
-library(ggplot2) # The standard for plotting, IMHO. Now included in the tidyverse package.
-
-ScopeIP &lt;- &#39;192.168.3.14&#39;
-ScopePort &lt;- 5025
-
-AcqPoints &lt;- 10000
+ScopeIP &lt;- &#39;192.168.3.14&#39; # Your scope&#39;s IP address, hostname might work
+ScopePort &lt;- 5025         # For Keysight
 
 
-## Get Instrument ID and exit
+## Example: Get Instrument ID and exit
 ##
 con &lt;- scopeConnect(ScopeIP, ScopePort)
-
 writeLines(&quot;*IDN?&quot;, con)
 flush(con)
 ScopeID &lt;- readLines(con)
@@ -343,17 +338,17 @@ close(con)
 ScopeID
 
 
-## Get Waveform Data from Channel 1 into a Data Frame and Exit
+## Example: Get Waveform Data from Channel 1 into a Data Frame and Exit
 ##
+AcqPoints &lt;- 10000 # Number of waveform points to request
 wf1 &lt;- NULL
 con &lt;- scopeConnect(ScopeIP, ScopePort)
 wf1 &lt;- scopeGetSingleWaveform(con, 1, AcqPoints)
 close(con)
+str(wf1) # Look at data frame contents
 
-str(wf1) # Look at what is in the data frame
 
-
-## Get Waveform Data and Print Some Debug Info
+## Example: Get Waveform Data and Print Some Debug Info
 ##
 wf1 &lt;- NULL
 con &lt;- scopeConnect(ScopeIP, ScopePort)
@@ -363,20 +358,18 @@ close(con)
 
 ## Plot the waveform
 ##
+library(ggplot2) # The standard for plotting, IMHO. Now included in the tidyverse package.
+
 ggplot(wf1) + geom_line(aes(x = t * 1e9, y = y), color = &#39;blue&#39;)  + xlab(&#39;t, ns&#39;)
 
 
-
-
-## PC Side FFT Loop with Frequency Domain Signal Averaging - Do higher resolution FFTs than the scope will do
+## Example: PC Side FFT Loop with Frequency Domain Signal Averaging - Do higher resolution FFTs than the scope will do
 ## 
-
-## Scope was set to 20 us/div and left in Single mode
+## Random length wire on Channel 1, 50 ohm input impedance, 20 us/div timebase, Single mode.
 
 library(dplyr)      # Data wrangling standard, included in tidyverse package
 library(fftwtools)  # Interface to fftw3
 library(e1071)      # For Hanning window generation
-
 
 AcqPoints &lt;- 500000 # 500k points for nice frequency domain resolution
 Title &lt;- &#39;Central NJ - FM Spectrum&#39;
@@ -384,10 +377,10 @@ Title &lt;- &#39;Central NJ - FM Spectrum&#39;
 wf1 &lt;- NULL
 con &lt;- scopeConnect(ScopeIP, ScopePort)
 
-DisplayStart &lt;-  87 # Mhz
+DisplayStart &lt;-  87 # Mhz FM broadcast range, likely something to see here
 DisplayEnd   &lt;- 110 # Mhz
 
-j &lt;- 5
+j &lt;- 5 # Number of acquisition loops and frequency domain spectra to average
 
 count &lt;- 0
 while (j &gt; 0) {
@@ -398,20 +391,19 @@ while (j &gt; 0) {
     flush(con)
 
     wf1 &lt;- scopeGetSingleWaveform(con, 1, AcqPoints, Debug = TRUE) # Get the waveform data
-
-    str(wf1)
+    str(wf1) # Display summary of data to verify actual number of points, etc
 #    p &lt;- ggplot(wf1) + geom_line(aes(x = t * 1e9, y = y), color = &#39;blue&#39;)  + xlab(&#39;t, ns&#39;) # Plot raw data
 #    print(p)
 
-    if (count == 1) { # Compute Hanning window data on the first pass
+    if (count == 1) {                                       # Compute Hanning window data on the first pass
         Hanning &lt;- hanning.window(length(wf1$y))
     }
-    sfft &lt;- fftw(wf1$y * Hanning, HermConj=0)
-    pwr &lt;- sqrt(Re(sfft) * Re(sfft) + Im(sfft) *  Im(sfft))
+    sfft &lt;- fftw(wf1$y * Hanning, HermConj=0)               # Compute FFT with Hanning apodization
+    pwr &lt;- sqrt(Re(sfft) * Re(sfft) + Im(sfft) *  Im(sfft)) # Compute power spectrum
 
-    str(pwr) # Look at data on each pass
+    str(pwr)                                                # Look at data on each pass
 
-    if (count == 1) { # Compute the x / frequency axis on first pass
+    if (count == 1) {                                       # Compute the x / frequency axis on first pass
         pwr_sum &lt;- pwr
         TimePerChannel &lt;- wf1$t[2] - wf1$t[1]
         NyquistFrequency &lt;- (1 / (2*TimePerChannel))
@@ -419,70 +411,62 @@ while (j &gt; 0) {
         f &lt;- seq(from = 0, by = FrequencyPerChannel, length = length(pwr_sum))
 
         pwr_spectrum &lt;- data.frame(list(F = f, Pwr = pwr_sum))
-        pwr_spectrum$F &lt;- pwr_spectrum$F / 1e6 # Convert to MHz for this example
+        pwr_spectrum$F &lt;- pwr_spectrum$F / 1e6              # Convert to MHz for this example
 
     } else {
-        pwr_sum &lt;- pwr_sum + pwr    # Signal average
-        pwr_spectrum$Pwr &lt;- pwr_sum # Put current average into the data frame
+        pwr_sum &lt;- pwr_sum + pwr                            # Signal average
+        pwr_spectrum$Pwr &lt;- pwr_sum                         # Put current average into the data frame
     }
 
-    pTitle &lt;- paste(Title, &#39; -- &#39;, count, &#39;averages&#39;)
+    pTitle &lt;- paste(Title, &#39; -- &#39;, count, &#39;averages&#39;)       # Plot the current averaged power spectrum
     display_data &lt;- pwr_spectrum %&gt;% filter(F &gt;= DisplayStart &amp; F &lt;= DisplayEnd)
     p &lt;- ggplot(display_data) + geom_line(aes(x = F, y = Pwr), color = &#39;blue&#39;) +
       xlab(&#39;F, MHz&#39;) + ggtitle(pTitle) # + scale_y_log10()
     print(p)
 
-    Sys.sleep(2) # Delay so that we can observe the spectrum on each loop
+    Sys.sleep(2)                                            # Delay so that we can observe the spectrum on each loop
 }
 
 close(con)
-
 str(pwr_spectrum)
-
 
 
 ## Peak Detection and Plotting Demonstation
 ##
+library(wmtsa) # For peak detection, uses MASS which overloads dplyr&#39;s select
 
-library(wmtsa) # For peak detection (warning: uses MASS which overloads dplyr::select)
-
-DisplayStart &lt;-  87 # Mhz
+DisplayStart &lt;-  87 # Mhz Full FM broadcast range
 DisplayEnd   &lt;- 107 # Mhz
 
-DisplayStart &lt;-  87.5 # Mhz
-DisplayEnd   &lt;-  95 # Mhz
+DisplayStart &lt;-  87.5 # Mhz Lower end of FM broadcast range
+DisplayEnd   &lt;-  95.0 # Mhz
 
 display_data &lt;- pwr_spectrum %&gt;% filter(F &gt;= DisplayStart &amp; F &lt;= DisplayEnd)
 
-SNRmin &lt;- 1 # Peak detection value
-
+SNRmin &lt;- 1 # Find some of the larger peaks
 W &lt;- wavCWT(display_data$Pwr)
 z &lt;- wavCWTTree(W)
-
 pk &lt;- wavCWTPeaks(z, snr.min = SNRmin, length.min = 2, noise.fun = &#39;sd&#39;, noise.span = 2)
-pk
-
 str(pk)
 
-f0 &lt;- display_data$F[1]
+f0 &lt;- display_data$F[1] # Channel to frequency conversion
 df &lt;- display_data$F[2] - display_data$F[1]
 
-## Peaks &lt;- f0 + df * pk$x
-
-Peaks &lt;- data.frame(list(F = f0 + df * pk$x, Height = pk$y, Chan = pk$x))
+Peaks &lt;- data.frame(list(F = f0 + df * pk$x, Height = pk$y, Chan = pk$x)) # Put peaks in a data frame
 Peaks
 
+Title &lt;- &#39;Central NJ - FM Broadcast Spectrum&#39;
 
-HeightThreshold &lt;- 2
+HeightThreshold &lt;- 20 # Arbitrary, and manually set, should select Top N and watch distance between labels
 Peaks &lt;- Peaks %&gt;% filter(Height &gt; HeightThreshold)
-Peaks
+Peaks # List the peaks
 
-label_offset &lt;- (1.01 * max(display_data$Pwr)) - max(display_data$Pwr)
+label_offset &lt;- 0.02 * max(display_data$Pwr) # Position peak labels just above peak top
 
 ggplot(display_data) + geom_line(aes(x = F, y = Pwr), color = &#39;blue&#39;) +
     xlab(&#39;F, MHz&#39;) + ylab(&#39;Power&#39;) + ggtitle(Title) +
-    geom_text(data = Peaks, aes(x = F, y = Height + label_offset, label = sprintf(&#39;%0.1f&#39;, F)), size = 2.5)
-
+    geom_text(data = Peaks, aes(x = F, y = Height +
+    label_offset, label = sprintf(&#39;%0.1f&#39;, F))) + theme_jm2
 
 ## Save plot to PDF
 OutFile &lt;- &#39;/n2/r-reports/fm2.pdf&#39;
@@ -492,13 +476,8 @@ ggsave(OutFile, dpi=150, height = 8.5, width = 11)
 OutFile &lt;- &#39;/n2/r-reports/fm2.png&#39;
 ggsave(OutFile, dpi=150, height = 4, width = 8) # Labels too close to peak tops with 4 x 8
 
-
-
-## ########################
-
 ## Write frequency domain data to a file
-
-write.table(pwr_spectrum, &#39;fd-25avg-1.dat&#39;, quote=FALSE)
+write.table(pwr_spectrum, &#39;fd-25avg-1.dat&#39;, quote=FALSE) # Space separated data file
 </code></pre>
 
 <h2>Set up R to Read and Display Previously Saved Frequency Domain Data</h2>
@@ -521,7 +500,7 @@ theme_jm2 &lt;- theme_bw() +
         strip.text.y = element_text(size = rel(1.7), colour = &quot;black&quot;, face = &#39;bold&#39;) # Enhance readability of facet labels
     )
 
-File &lt;- &#39;~/lab/R/data/scope-fanfare-5Gs-50ohm-fd-25avg-1.dat&#39; # A previously acquired spectrum with 25 averages
+File &lt;- &#39;~/lab/R/data/scope-fanfare-5Gs-50ohm-fd-25avg-1.dat&#39; # A previously acquired frequency domain spectrum
 pwr_spectrum &lt;- read.table(File, header = TRUE)
 
 head(pwr_spectrum, 10) # Inspect the data
@@ -635,7 +614,7 @@ Peaks # List the peaks
 ## 36 106.915   35.70935 3982
 </code></pre>
 
-<pre><code class="r">label_offset &lt;- 0.02 * max(display_data$Pwr)
+<pre><code class="r">label_offset &lt;- 0.02 * max(display_data$Pwr) # Position peak labels just above peak top
 
 ggplot(display_data) + geom_line(aes(x = F, y = Pwr), color = &#39;blue&#39;) +
     xlab(&#39;F, MHz&#39;) + ylab(&#39;Power&#39;) + ggtitle(Title) +
