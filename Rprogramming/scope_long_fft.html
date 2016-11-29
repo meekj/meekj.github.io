@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
-<title>Oscilloscope Based Spectrum Analysis: Acquisition and Long FFT of Oscilloscope Waveforms in R</title>
+<title>Oscilloscope Based Spectrum Analysis: Acquisition and Long FFT of Waveforms in R</title>
 
 <script type="text/javascript">
 window.onload = function() {
@@ -201,7 +201,7 @@ hr {
 </head>
 
 <body>
-<h2>Oscilloscope Based Spectrum Analysis: Acquisition and Long FFT of Oscilloscope Waveforms in R</h2>
+<h2>Oscilloscope Based Spectrum Analysis: Acquisition and Long FFT of Waveforms in R</h2>
 
 <h3>Jon Meek -  November 2016</h3>
 
@@ -486,7 +486,7 @@ write.table(pwr_spectrum, File, quote=FALSE) # Space separated data file
 
 <h2>Use R to Read and Display Previously Saved Frequency Domain Data</h2>
 
-<pre><code class="r">RCSid &lt;- &#39;$Id: scope_long_fft.Rmd,v 1.1 2016/11/29 02:45:55 meekj Exp $&#39;
+<pre><code class="r">RCSid &lt;- &#39;$Id: scope_long_fft.Rmd,v 1.2 2016/11/29 15:52:17 meekj Exp $&#39;
 
 library(ggplot2)
 suppressMessages(library(dplyr)) # Messages about masked objects are suppresed for presentation cleanliness
@@ -688,7 +688,7 @@ ggplot(display_data) + geom_line(aes(x = F, y = Pwr), color = &#39;blue&#39;) +
 
 <hr/>
 
-<p>$Id: scope_long_fft.Rmd,v 1.1 2016/11/29 02:45:55 meekj Exp $</p>
+<p>$Id: scope_long_fft.Rmd,v 1.2 2016/11/29 15:52:17 meekj Exp $</p>
 
 <style type="text/css">body {max-width: 1400px;margin: auto;padding: 1em;line-height: 20px ; }</style>
 
